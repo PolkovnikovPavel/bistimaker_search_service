@@ -1,0 +1,41 @@
+redis:
+docker network ls
+docker network create redis-network
+docker run --name redis -d --network redis-network -p 6379:6379 redis
+docker run --name redis -d -p 6379:6379 redis
+
+
+на винде:
+g:
+cd G:\Другие компьютеры\Ноутбук\python\all_servers\bistimaker\search_service
+
+docker login
+docker-compose up -d
+docker tag search_service-search_service:latest setorg/search_service:latest
+docker push setorg/search_service:latest
+
+
+на сервере:
+
+docker ps
+docker stop search_service
+docker rm search_service
+
+docker images
+docker tag setorg/search_service:latest setorg/search_service:old
+docker rmi setorg/search_service:latest
+docker pull setorg/search_service:latest
+docker rmi setorg/search_service:old
+
+docker run -d --name search_service --network redis-network -p 6600:6600 setorg/search_service:latest
+
+docker ps
+docker logs search_service
+
+
+
+search_service-search_service
+
+
+
+

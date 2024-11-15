@@ -1,0 +1,13 @@
+version: '3.10'
+
+services:
+  search_service:
+    build: .
+    container_name: search_service_container
+    ports:
+      - "6600:6600"
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql://client:password@172.17.6.166:6000/bistimakerdb
