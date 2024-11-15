@@ -1,6 +1,11 @@
+import logging
+import logging.handlers
+
 import time
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from app.api.db import SessionLocal, users_table, bestiaries_table, category_table, entity_table, commentary_table
 from sqlalchemy import and_, or_
 from fuzzywuzzy import fuzz
@@ -10,6 +15,18 @@ from app.api.models import *   # Модели Pydantic для валидации
 from app.api.sort_models import *
 from app.api.including_redis import *
 
+# Настройка логгера
+logging.basicConfig(
+    level=logging.INFO,  # Уровень логирования
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Формат сообщения
+    handlers=[
+        # Файловый обработчик
+        logging.handlers.RotatingFileHandler("app/logs/app.log", maxBytes=100*1024, backupCount=5, encoding='utf-8'),
+        logging.StreamHandler()  # Обработчик для вывода в консоль (опционально)
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 app_v1 = FastAPI(
     title="search API",
@@ -125,7 +142,10 @@ def read_bestiary(
     )
 
     cached_data = get_cache_from_redis(str(settings), '')
+
+    logger.info(f"Global search: {settings}")
     if cached_data:
+        logger.info("Using cached data")
         return cached_data[settings.shift:min(settings.shift + settings.amount_per_page, len(cached_data))]
     db = SessionLocal()
 
@@ -144,7 +164,8 @@ def read_bestiary(
     )
 
     results = query.all()
-    print(results)
+    logger.info(f"Using DB: results len = {len(results)}")
+
     if settings.search is not None:
         settings.search = ' '.join(settings.search.split())
     else:
@@ -156,6 +177,30 @@ def read_bestiary(
 
     set_cache(str(settings), '', results)
     return results[settings.shift:min(settings.shift + settings.amount_per_page, len(results))]
+
+
+class ErrorLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start_time = time.time()
+        client_ip = request.client.host
+        method = request.method
+        url = request.url.path
+        query_params = dict(request.query_params)
+
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            logger.error(f"Exception occurred: {e}", exc_info=True)
+            raise e
+        finally:
+            process_time = time.time() - start_time
+            logger.info(f"Request completed: IP={client_ip}, Method={method}, URL={url}, StatusCode={response.status_code}, ProcessTime={process_time:.4f}s, QueryParams={query_params}")
+
+        return response
+
+
+app_v1.add_middleware(ErrorLoggingMiddleware)
+logger.info('Start')
 
 
 if __name__ == '__main__':

@@ -27,7 +27,7 @@ docker rmi setorg/search_service:latest
 docker pull setorg/search_service:latest
 docker rmi setorg/search_service:old
 
-docker run -d --name search_service --network redis-network -p 6600:6600 setorg/search_service:latest
+docker run -d --name search_service --network redis-network -p 6600:6600 -v /usr/local/logs/search-service-logs:/app/app/logs setorg/search_service:latest
 
 docker ps
 docker logs search_service
